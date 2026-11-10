@@ -37,6 +37,22 @@ sudo pacman -S riscv64-linux-gnu-gcc u-boot-tools cpio python podman qemu-user-s
 # Debian: gcc-riscv64-linux-gnu u-boot-tools cpio python3 podman qemu-user-static binfmt-support
 ```
 
+binfmt must point at **`qemu-riscv64-static`**, not the dynamic `qemu-riscv64`,
+or containers fail with ENOENT. Check `/proc/sys/fs/binfmt_misc/qemu-riscv64`.
+
+If the host `mkimage` is broken (typically `libssl.so.4` missing),
+`pack-fit.sh` falls back to mkimage in a debian container automatically.
+
+## Kernel source
+
+```bash
+./scripts/build-kernel.sh                               # 1. cdn.kernel.org tarball
+GITURL=diana:work/repos/linux ./scripts/build-kernel.sh  # 2. clone tag v<KVER> (GITREF overrides)
+SRC=~/src/linux-7.4-rc1 ./scripts/build-kernel.sh        # 3. copy a local tree
+```
+
+Use 2 or 3 when kernel.org has no tarball for the version (e.g. a linux-next tag).
+
 ## Why a full guest Linux
 
 Five conditions must hold together; miss one and the reader always sees the
