@@ -3,7 +3,11 @@
 #
 # usage:
 #   ./scripts/pack-fit.sh -t base-r1
-#   ./scripts/pack-fit.sh -t fix-r1 -k dist/Image-fix -i dist/initramfs.cpio.gz -o dist
+#   ./scripts/pack-fit.sh -t fix-r1 -k dist/Image-fix -o dist
+#
+# mkimage comes from one of two places:
+#   1. the host mkimage (fastest)
+#   2. if the host one is broken/missing (e.g. libssl.so.4) -> fall back to mkimage in a debian container
 #
 # note: the load addresses are what bootm 0x140000000 in K3 U-Boot relies on - do not change.
 set -euo pipefail
@@ -15,6 +19,8 @@ KIMG=${KIMG:-$DIST/Image}
 FDT=${FDT:-$DIST/k3-pico-itx.dtb}
 INITRD=${INITRD:-$DIST/initramfs.cpio.gz}
 OUT=${OUT:-$DIST}
+ENGINE=${ENGINE:-}
+CTR_IMAGE=${CTR_IMAGE:-docker.io/library/debian:trixie-slim}
 
 say() { printf '\n== %s ==\n' "$*"; }
 
@@ -32,19 +38,49 @@ done
 for f in "$KIMG" "$FDT" "$INITRD"; do
 	[ -f "$f" ] || { echo "!! missing file: $f"; exit 1; }
 done
-command -v mkimage >/dev/null || { echo "!! missing mkimage (pacman -S u-boot-tools)"; exit 1; }
 mkdir -p "$OUT"
 
-ITS=$OUT/.$TAG.its
-sed -e "s|__KIMG__|$(readlink -f "$KIMG")|" \
-    -e "s|__FDT__|$(readlink -f "$FDT")|" \
-    -e "s|__INITRD__|$(readlink -f "$INITRD")|" \
-    "$HERE/scripts/k3-vstlb.its" > "$ITS"
+# stage the three inputs in one directory: the container fallback mounts only this
+STAGE=$OUT/.fit
+rm -rf "$STAGE"; mkdir -p "$STAGE"
+cp -f "$KIMG"   "$STAGE/Image"
+cp -f "$FDT"    "$STAGE/board.dtb"
+cp -f "$INITRD" "$STAGE/initramfs.cpio.gz"
 
-say "mkimage -> $OUT/Image-$TAG.itb"
-mkimage -f "$ITS" "$OUT/Image-$TAG.itb"
-rm -f "$ITS"
-ls -lh "$OUT/Image-$TAG.itb"
+gen_its() {	# $1 = incbin path prefix
+	sed -e "s|__KIMG__|$1/Image|" \
+	    -e "s|__FDT__|$1/board.dtb|" \
+	    -e "s|__INITRD__|$1/initramfs.cpio.gz|" \
+	    "$HERE/scripts/k3-vstlb.its"
+}
+
+ITB=$OUT/Image-$TAG.itb
+DONE=0
+
+if command -v mkimage >/dev/null 2>&1; then
+	say "host mkimage -> $ITB"
+	gen_its "$STAGE" > "$STAGE/fit.its"
+	if mkimage -f "$STAGE/fit.its" "$ITB" 2> "$STAGE/mkimage.err"; then
+		DONE=1
+	else
+		echo "   host mkimage failed: $(head -1 "$STAGE/mkimage.err")"
+	fi
+fi
+
+if [ "$DONE" = 0 ]; then
+	if [ -z "$ENGINE" ]; then
+		if command -v podman >/dev/null; then ENGINE=podman
+		elif command -v docker >/dev/null; then ENGINE=docker
+		else echo "!! no usable mkimage and no podman/docker"; exit 1; fi
+	fi
+	say "container mkimage ($ENGINE, $CTR_IMAGE) -> $ITB"
+	gen_its "/d/.fit" > "$STAGE/fit.its"
+	"$ENGINE" run --rm -v "$OUT:/d" "$CTR_IMAGE" /bin/sh -c \
+		'apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq u-boot-tools >/dev/null 2>&1 && exec mkimage -f /d/.fit/fit.its /d/'"$(basename "$ITB")"
+fi
+
+rm -rf "$STAGE"
+ls -lh "$ITB"
 
 say "provenance (kernel _etext baked into the FIT)"
-if [ -f "$DIST/Image.prov" ]; then cat "$DIST/Image.prov"; fi
+[ -f "$DIST/Image.prov" ] && cat "$DIST/Image.prov" || true
