@@ -25,6 +25,8 @@ HW=${HW:-k3-pico-itx}
 BUILD=${BUILD:-$HERE/build}
 DIST=${DIST:-$HERE/dist}
 PATCHDIR=${PATCHDIR:-}
+GITURL=${GITURL:-}	# source option 2: git repo (e.g. diana:work/repos/linux, clone tag v<KVER>)
+SRC=${SRC:-}		# source option 3: existing source tree (copied)
 
 SRCDIR=$BUILD/linux-$KVER
 mkdir -p "$BUILD" "$DIST"
@@ -33,7 +35,16 @@ say() { printf '\n== %s ==\n' "$*"; }
 
 say "kernel $KVER -> $DIST/Image (CONFIG_KVM=y)"
 
-if [ ! -d "$SRCDIR" ]; then
+if [ -d "$SRCDIR" ]; then
+	:
+elif [ -n "$SRC" ]; then
+	say "copying local source tree: $SRC"
+	mkdir -p "$SRCDIR"
+	( cd "$SRC" && tar -cf - . ) | tar -C "$SRCDIR" -xf -
+elif [ -n "$GITURL" ]; then
+	say "git clone --depth 1 -b $KVER $GITURL"
+	git clone --depth 1 --branch "$KVER" "$GITURL" "$SRCDIR"
+else
 	MAJOR=${KVER%%.*}
 	URL=https://cdn.kernel.org/pub/linux/kernel/v$MAJOR.x/linux-$KVER.tar.xz
 	TARBALL=$BUILD/linux-$KVER.tar.xz
