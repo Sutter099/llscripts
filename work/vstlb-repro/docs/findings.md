@@ -69,6 +69,20 @@ kernel before taking numbers.
 | full initramfs rebuild for one file | slow; use `repack-initramfs.sh` |
 | new initrd, old FIT | initrd is embedded in the .itb; re-run `pack-fit.sh` |
 
+## End-to-end check
+
+Built from this repo on monica (Arch x86_64, 20 cores):
+
+```
+ffffffff80c41858 T _etext              <- same as the hand-built base kernel
+libs copied: 45, unresolved: none
+container mkimage -> dist/Image-vstlb.itb (59M)
+```
+
+On the board, 8 iterations: `VSTLB-SUMMARY tag=mnc-r1 total=8 bug=6 ok=2 err=0`
+with `VSTLB-PROV ffffffff80c41858`. Repo → build host → .itb → board →
+`BUG_REPRODUCED`.
+
 ## kselftest variant (did not work)
 
 - S-mode, two vCPUs: 6/6 PASS; the control run shows it cannot hit the entry.
