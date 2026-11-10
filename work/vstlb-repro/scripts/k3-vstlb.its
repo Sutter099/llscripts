@@ -1,0 +1,46 @@
+/dts-v1/;
+
+/ {
+	description = "K3 vstlb: kernel + k3-pico-itx dtb + vstlb host initramfs";
+	#address-cells = <2>;
+
+	images {
+		kernel {
+			description = "vstlb test kernel";
+			data = /incbin/("__KIMG__");
+			type = "kernel";
+			arch = "riscv";
+			os = "linux";
+			compression = "none";
+			load = <0x1 0x02200000>;
+			entry = <0x1 0x02200000>;
+		};
+		fdt {
+			description = "k3-pico-itx dtb";
+			data = /incbin/("__FDT__");
+			type = "flat_dt";
+			arch = "riscv";
+			compression = "none";
+			load = <0x1 0x20000000>;
+		};
+		ramdisk {
+			description = "vstlb host initramfs";
+			data = /incbin/("__INITRD__");
+			type = "ramdisk";
+			arch = "riscv";
+			os = "linux";
+			compression = "none";
+			load = <0x1 0x30000000>;
+		};
+	};
+
+	configurations {
+		default = "conf-vstlb";
+		conf-vstlb {
+			description = "vstlb test";
+			kernel = "kernel";
+			fdt = "fdt";
+			ramdisk = "ramdisk";
+		};
+	};
+};

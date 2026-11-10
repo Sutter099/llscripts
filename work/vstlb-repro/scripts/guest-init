@@ -1,0 +1,12 @@
+#!/bin/busybox sh
+# guest /init for the stale VS-stage TLB reproducer
+/bin/busybox --install -s
+mount -t devtmpfs devtmpfs /dev 2>/dev/null
+mount -t proc     proc     /proc 2>/dev/null
+mount -t sysfs    sysfs    /sys 2>/dev/null
+
+echo "GUEST_INIT kernel=$(uname -r)"
+grep -i "asid" /proc/cpuinfo 2>/dev/null | head -2
+dmesg 2>/dev/null | grep -i "asid" | head -3
+
+exec /vstlb_guest

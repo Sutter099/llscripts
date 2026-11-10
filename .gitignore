@@ -1,0 +1,23 @@
+# no build artefacts in git
+dist/
+build/
+results/
+
+# kernel / initramfs / FIT
+*.itb
+*.cpio
+*.cpio.gz
+*.dtb
+*.dtb.tmp
+Image
+Image-*
+*.prov
+vmlinux
+System.map
+*.ko
+*.o
+*.a
+
+# editors
+*.swp
+.vstlb*

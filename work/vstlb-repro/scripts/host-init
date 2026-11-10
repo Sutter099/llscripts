@@ -1,0 +1,31 @@
+#!/bin/busybox sh
+# host (/init) for the K3 KVM host side: prepare /dev/kvm and land in a shell
+/bin/busybox --install -s
+
+mount -t devtmpfs devtmpfs /dev 2>/dev/null
+mount -t proc     proc     /proc
+mount -t sysfs    sysfs    /sys
+mount -t tmpfs    tmpfs    /tmp
+mkdir -p /dev/pts
+mount -t devpts devpts /dev/pts 2>/dev/null
+
+export LD_LIBRARY_PATH=/usr/lib/riscv64-linux-gnu:/lib/riscv64-linux-gnu
+export PATH=/usr/bin:/bin:/sbin:/usr/sbin
+export TMPDIR=/tmp
+
+[ -c /dev/kvm ] || mknod /dev/kvm c 10 232
+chmod 666 /dev/kvm
+
+echo
+echo "=========== vstlb KVM host initramfs ==========="
+echo " kernel : $(uname -r)"
+echo " cmdline: $(cat /proc/cmdline)"
+echo " kvm    : $(ls -l /dev/kvm 2>&1)"
+echo " qemu   : $(qemu-system-riscv64 --version 2>&1 | head -1)"
+echo " accel  : $(qemu-system-riscv64 -accel help 2>&1 | tr '\n' ' ')"
+echo " etext  : $(grep ' _etext' /proc/kallsyms)"
+echo " test   : /test/run-vstlb.sh <tag> <iters>"
+echo "================================================"
+echo
+
+exec setsid cttyhack sh
