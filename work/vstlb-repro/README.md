@@ -14,6 +14,9 @@ generated on the build host and never committed.
 ./scripts/run-on-k3.sh base-r1 8   # boot board, 8 iterations, log in results/
 ```
 
+On a riscv64 host you must not modify (borrowed machine, no kernel rebuild),
+use the userspace-only path instead: [docs/host.md](docs/host.md).
+
 | Artefact (`dist/`) | Purpose |
 |---|---|
 | `Image` | riscv64 kernel, `CONFIG_KVM=y`, host and guest |
@@ -75,9 +78,11 @@ scripts/build-kernel.sh      Image + DTB        scripts/pack-fit.sh       .itb
 scripts/build-sysroot.sh     riscv64 qemu/busybox  scripts/build-all.sh    all stages
 scripts/build-progs.sh       the two ELFs       scripts/run-on-k3.sh      board run
 scripts/build-initramfs.sh   both initramfs     scripts/run-vstlb.sh      on-board loop
+scripts/build-host-kit.sh    kit for a host     scripts/run-on-host.sh    host run (userspace only)
 scripts/repack-initramfs.sh  replace one file   scripts/mkclosure.py      lib closure
 src/vstlb_host.c             host controller    src/vstlb_guest.c         guest victim
 patches/                     A/B patch          docs/findings.md          measurements
+docs/host.md                 borrowed-host flow
 ```
 
 ## Reading the result
