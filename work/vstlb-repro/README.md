@@ -1,111 +1,60 @@
 # vstlb-repro
 
-Stale **VS-stage TLB entry** in RISC-V KVM. After a vCPU is migrated to another
-hart, the entry left on the old hart is not invalidated; another vCPU of the
-same VM hits it there and reads a stale translation.
+Stale **VS-stage TLB entry** in RISC-V KVM.
 
-Scripts and sources only — the kernel image, initramfs, sysroot and FIT are
-generated on the build host and never committed.
+A vCPU is migrated to another hart; the VS-stage entry it created on the old
+hart is not invalidated; another vCPU of the same VM hits that entry there and
+reads a **stale translation**.
 
-## Quick start
+## Five conditions
 
-```bash
-./scripts/build-all.sh             # kernel + sysroot + 2 ELFs + 2 initramfs + .itb
-./scripts/run-on-k3.sh base-r1 8   # boot board, 8 iterations, log in results/
-```
-
-On a riscv64 host you must not modify (borrowed machine, no kernel rebuild),
-use the userspace-only path instead: [docs/host.md](docs/host.md).
-
-| Artefact (`dist/`) | Purpose |
-|---|---|
-| `Image` | riscv64 kernel, `CONFIG_KVM=y`, host and guest |
-| `k3-pico-itx.dtb` | from `make dtbs` |
-| `guest.cpio.gz` | guest initramfs |
-| `initramfs.cpio.gz` | board initramfs (contains qemu) |
-| `Image-<tag>.itb` | FIT for `tftpboot` + `bootm` |
-
-## Dependencies
-
-| Need | For | Missing symptom |
-|---|---|---|
-| `riscv64-linux-gnu-gcc` | kernel, both ELFs | — |
-| `mkimage` (u-boot-tools) | FIT | `mkimage: not found` |
-| `cpio` `gzip` `curl` `python3` | initramfs, download, lib closure | — |
-| podman/docker + riscv64 binfmt | riscv64 qemu + busybox | container exec: `no such file or directory` |
-| K3/X100 board, serial, tftp | real hardware | TCG cannot reproduce this |
-
-```bash
-sudo pacman -S riscv64-linux-gnu-gcc u-boot-tools cpio python podman qemu-user-static-binfmt
-# Debian: gcc-riscv64-linux-gnu u-boot-tools cpio python3 podman qemu-user-static binfmt-support
-```
-
-binfmt must point at **`qemu-riscv64-static`**, not the dynamic `qemu-riscv64`,
-or containers fail with ENOENT. Check `/proc/sys/fs/binfmt_misc/qemu-riscv64`.
-
-If the host `mkimage` is broken (typically `libssl.so.4` missing),
-`pack-fit.sh` falls back to mkimage in a debian container automatically.
-
-## Kernel source
-
-```bash
-./scripts/build-kernel.sh                               # 1. cdn.kernel.org tarball
-GITURL=diana:work/repos/linux ./scripts/build-kernel.sh  # 2. clone tag v<KVER> (GITREF overrides)
-SRC=~/src/linux-7.4-rc1 ./scripts/build-kernel.sh        # 3. copy a local tree
-```
-
-Use 2 or 3 when kernel.org has no tarball for the version (e.g. a linux-next tag).
-
-## Why a full guest Linux
-
-Five conditions must hold together; miss one and the reader always sees the
-new value:
+All must hold, otherwise the reader always sees the new value:
 
 1. one VM, two vCPUs, same VMID
-2. same non-zero ASID on both vCPUs
-3. the entry is created by a **U-mode** access
-4. the update flushes **locally** only (guest `sfence.vma`, no broadcast)
+2. both vCPUs share the same non-zero ASID
+3. the entry is created by a **U-mode** access (S-mode does not reuse it here)
+4. the mapping update flushes **locally** only (guest `sfence.vma`)
 5. the vCPU is migrated between creation and update
 
-kselftest / kvm-unit-tests payloads run in VS-mode S with no U-mode and no
-real ASID allocator; TCG has no hardware TLB residue. A real guest Linux
-supplies `mm_cpumask`, ASIDs and the COW-triggered local `sfence.vma`.
+## Run it
+
+```bash
+CROSS=riscv64-linux-gnu- BUSYBOX=/path/to/riscv64-busybox ./build.sh
+KERNEL=/path/to/Image ./run.sh tag 8 0 1   # 8 iterations, logs in results/
+```
+
+On the KVM host you need `qemu-system-riscv64` with the kvm accelerator and a
+writable `/dev/kvm`. Nothing else: the guest kernel is passed with `-kernel` and
+the guest payload is a static ELF, so no sysroot, no library closure and **no
+kernel rebuild**. `build.sh` only needs one riscv64 static busybox to build the
+guest initramfs (`apt download busybox-static && dpkg -x ...`).
+
+`KERNEL` can be omitted if `dist/Image` exists; otherwise `run.sh` falls back to
+`/boot/vmlinuz-$(uname -r)`.
+
+## Results
+
+| Platform | Host kernel | Iters | Hits |
+|---|---|---|---|
+| SpacemiT K3 / X100 | v7.4-rc1, unpatched | 19 | 15 |
+| SpacemiT K3 / X100 | v7.4-rc1 + fix | 6 | 0 |
+| SpacemiT K3 / X100 | v7.4-rc1, this layout | 6 | 5 |
+| SpacemiT v100 | Ubuntu 7.0.0-30, untouched | 42 | 36 (86%) |
+
+Different silicon and a different host kernel give the same result, so this is
+a generic RISC-V KVM issue, not a board quirk. Measurements and pitfalls:
+[docs/findings.md](docs/findings.md).
 
 ## Layout
 
 ```
-scripts/build-kernel.sh      Image + DTB        scripts/pack-fit.sh       .itb
-scripts/build-sysroot.sh     riscv64 qemu/busybox  scripts/build-all.sh    all stages
-scripts/build-progs.sh       the two ELFs       scripts/run-on-k3.sh      board run
-scripts/build-initramfs.sh   both initramfs     scripts/run-vstlb.sh      on-board loop
-scripts/build-host-kit.sh    kit for a host     scripts/run-on-host.sh    host run (userspace only)
-scripts/repack-initramfs.sh  replace one file   scripts/mkclosure.py      lib closure
-src/vstlb_host.c             host controller    src/vstlb_guest.c         guest victim
-patches/                     A/B patch          docs/findings.md          measurements
-docs/host.md                 borrowed-host flow
+build.sh     cross-build both binaries + guest initramfs
+run.sh       run N iterations on this host (userspace only)
+src/         vstlb_host.c (controller, QMP, affinity) + vstlb_guest.c (victim)
+docs/        measurements, U-mode vs S-mode finding, pitfalls
+patches/     candidate fix, for the A/B control
+board/       K3/X100 only: FIT, tftp, serial, custom host kernel - see board/README.md
 ```
 
-## Reading the result
-
-```
-VSTLB-PROV ffffffff80c41858 T _etext     <- which kernel actually runs
-VSTLB-SUMMARY tag=base-r1 total=8 bug=7 ok=1 err=0
-```
-
-| rc | Meaning |
-|---|---|
-| 0 | stale value read — stale VS-stage entry hit |
-| 1 | new value read |
-| 2+ | infrastructure error, iteration does not count |
-
-Probabilistic: one PASS/FAIL means nothing, run at least 8.
-
-## A/B control
-
-```bash
-PATCHDIR=patches TAG=fix-r1 ./scripts/build-all.sh
-./scripts/run-on-k3.sh base-r1 8
-./scripts/run-on-k3.sh fix-r1  8
-```
-
-Different `_etext` per kernel — that is what `VSTLB-PROV` proves.
+`board/` is only needed to reproduce on a bare board. On any riscv64 host with
+KVM the two commands above are enough.

@@ -22,12 +22,37 @@
 #include <errno.h>
 #include <stdint.h>
 #include <sys/mman.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
 
 #define PAGE_SZ		4096UL
 #define INITIAL_VAL	0x0UL
 #define WRITE_VAL	0xCAFEBABEUL
 
 static volatile unsigned long *shared_page;
+
+/*
+ * This binary runs as /init in the guest initramfs, so it has to bring up the
+ * pseudo filesystems itself -- sysconf(_SC_NPROCESSORS_ONLN) reads
+ * /sys/devices/system/cpu/online, and /proc is needed by the re-exec below.
+ */
+static void setup_pseudo_fs(void)
+{
+	static const struct { const char *dir, *type; } fs[] = {
+		{ "/dev",  "devtmpfs" },
+		{ "/proc", "proc" },
+		{ "/sys",  "sysfs" },
+	};
+	unsigned int i;
+
+	for (i = 0; i < sizeof(fs) / sizeof(fs[0]); i++) {
+		mkdir(fs[i].dir, 0755);
+		if (mount(fs[i].type, fs[i].dir, fs[i].type, 0, NULL) &&
+		    errno != EBUSY)
+			fprintf(stderr, "mount %s: %s\n", fs[i].dir,
+				strerror(errno));
+	}
+}
 
 static int read_line(char *buf, size_t buflen)
 {
@@ -78,13 +103,17 @@ static int wait_for(const char *what, const char *expect)
 	}
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
 	unsigned long val;
 	long ncpus;
-	char *argv[3];
+	char *args[2];
+	const char *self;
+	int i;
 
+	(void)argc;
 	setvbuf(stdout, NULL, _IOLBF, 0);
+	setup_pseudo_fs();
 
 	/*
 	 * Pin to vCPU0 before touching anything, then re-exec once.  exec()
@@ -96,10 +125,19 @@ int main(void)
 	if (pin_guest_cpu(0))
 		return 1;
 	if (!getenv("VSTLB_REEXEC")) {
+		static const char *fallback[] = { "/init", "/vstlb_guest" };
+
 		setenv("VSTLB_REEXEC", "1", 1);
-		argv[0] = "/vstlb_guest";
-		argv[1] = NULL;
-		execv(argv[0], argv);
+		self = argv[0] ? argv[0] : "/init";
+		args[0] = (char *)self;
+		args[1] = NULL;
+		execv(self, args);
+		for (i = 0; i < (int)(sizeof(fallback) / sizeof(fallback[0])); i++) {
+			if (!strcmp(self, fallback[i]))
+				continue;
+			args[0] = (char *)fallback[i];
+			execv(args[0], args);
+		}
 		perror("execv");
 	}
 

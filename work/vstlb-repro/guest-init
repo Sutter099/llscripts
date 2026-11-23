@@ -1,0 +1,13 @@
+#!/bin/busybox sh
+# /init of the guest initramfs.
+#
+# The guest needs a shell-based init: booting the test binary directly as /init
+# does not reproduce (0/6 vs 5/6 on K3, cause not isolated).  This script brings
+# up the pseudo filesystems and hands over to the test program.
+/bin/busybox --install -s
+mount -t devtmpfs devtmpfs /dev  2>/dev/null
+mount -t proc     proc     /proc 2>/dev/null
+mount -t sysfs    sysfs    /sys  2>/dev/null
+mount -t tmpfs    tmpfs    /tmp  2>/dev/null
+echo "GUEST_INIT kernel=$(uname -r)"
+exec /vstlb_guest
