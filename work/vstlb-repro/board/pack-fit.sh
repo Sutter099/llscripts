@@ -2,8 +2,8 @@
 # pack-fit.sh - kernel Image + DTB + host initramfs -> one FIT (.itb)
 #
 # usage:
-#   ./scripts/pack-fit.sh -t base-r1
-#   ./scripts/pack-fit.sh -t fix-r1 -k dist/Image-fix -o dist
+#   ./board/pack-fit.sh -t base-r1
+#   ./board/pack-fit.sh -t fix-r1 -k dist/Image-fix -o dist
 #
 # mkimage comes from one of two places:
 #   1. the host mkimage (fastest)
@@ -51,7 +51,7 @@ gen_its() {	# $1 = incbin path prefix
 	sed -e "s|__KIMG__|$1/Image|" \
 	    -e "s|__FDT__|$1/board.dtb|" \
 	    -e "s|__INITRD__|$1/initramfs.cpio.gz|" \
-	    "$HERE/scripts/k3-vstlb.its"
+	    "$HERE/board/k3-vstlb.its"
 }
 
 ITB=$OUT/Image-$TAG.itb
