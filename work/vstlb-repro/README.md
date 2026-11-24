@@ -23,14 +23,10 @@ CROSS=riscv64-linux-gnu- BUSYBOX=/path/to/riscv64-busybox ./build.sh
 KERNEL=/path/to/Image ./run.sh tag 8 0 1   # 8 iterations, logs in results/
 ```
 
-On the KVM host you need `qemu-system-riscv64` with the kvm accelerator and a
-writable `/dev/kvm`. Nothing else: the guest kernel is passed with `-kernel` and
-the guest payload is a static ELF, so no sysroot, no library closure and **no
-kernel rebuild**. `build.sh` only needs one riscv64 static busybox to build the
-guest initramfs (`apt download busybox-static && dpkg -x ...`).
-
-`KERNEL` can be omitted if `dist/Image` exists; otherwise `run.sh` falls back to
-`/boot/vmlinuz-$(uname -r)`.
+On the KVM host only `qemu-system-riscv64` with the kvm accelerator and a
+writable `/dev/kvm` are needed; the guest kernel comes in with `-kernel`, so
+nothing else is built for the host. With `KERNEL` unset, `run.sh` takes
+`dist/Image` or `/boot/vmlinuz-$(uname -r)`.
 
 ## Results
 
