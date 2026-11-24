@@ -14,9 +14,7 @@ guest initramfs.
 | v100, repo scripts | same | 6 | 5 | 1 | 0 |
 
 ~80-86% hit rate unpatched, 0/6 with the candidate fix, and the tree in this
-repo replays the K3 unpatched case at 5/6. Different host kernel and different
-silicon hit the same entry, so this is a generic RISC-V KVM issue, not a board
-quirk.
+repo replays the K3 unpatched case at 5/6.
 
 ## U-mode vs S-mode
 

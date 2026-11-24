@@ -40,9 +40,7 @@ guest initramfs (`apt download busybox-static && dpkg -x ...`).
 | SpacemiT K3 / X100 | v7.4-rc1 + fix | 6 | 0 |
 | SpacemiT v100 | Ubuntu 7.0.0-30, untouched | 42 | 36 (86%) |
 
-Different silicon and a different host kernel give the same result, so this is
-a generic RISC-V KVM issue, not a board quirk. Measurements and pitfalls:
-[docs/findings.md](docs/findings.md).
+Measurements and pitfalls: [docs/findings.md](docs/findings.md).
 
 ## Layout
 
