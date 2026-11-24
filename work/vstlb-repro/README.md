@@ -6,6 +6,10 @@ A vCPU is migrated to another hart; the VS-stage entry it created on the old
 hart is not invalidated; another vCPU of the same VM hits that entry there and
 reads a **stale translation**.
 
+The harness is adapted from the reproducer Bill Xiang posted to linux-riscv,
+with the guest side moved from TCP to the guest console so it also runs from an
+initramfs on a bare board.
+
 ## Five conditions
 
 All must hold, otherwise the reader always sees the new value:
