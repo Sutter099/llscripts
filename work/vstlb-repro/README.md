@@ -38,7 +38,6 @@ guest initramfs (`apt download busybox-static && dpkg -x ...`).
 |---|---|---|---|
 | SpacemiT K3 / X100 | v7.4-rc1, unpatched | 19 | 15 |
 | SpacemiT K3 / X100 | v7.4-rc1 + fix | 6 | 0 |
-| SpacemiT K3 / X100 | v7.4-rc1, this layout | 6 | 5 |
 | SpacemiT v100 | Ubuntu 7.0.0-30, untouched | 42 | 36 (86%) |
 
 Different silicon and a different host kernel give the same result, so this is

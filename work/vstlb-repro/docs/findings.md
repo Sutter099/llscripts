@@ -10,13 +10,13 @@ guest initramfs.
 | K3 / X100 (harness bugs) | v7.4-rc1 | 12 | 0 | 0 | 12 |
 | K3 / X100 | v7.4-rc1 | 19 | **15** | 4 | 0 |
 | K3 / X100, patched | v7.4-rc1 + fix | 6 | **0** | 6 | 0 |
-| K3 / X100, this layout | v7.4-rc1 | 6 | **5** | 1 | 0 |
 | v100, userspace only | Ubuntu 7.0.0-30, untouched | 36 | **31** | 5 | 0 |
 | v100, repo scripts | same | 6 | 5 | 1 | 0 |
 
-~80-86% hit rate unpatched, 0/6 with the candidate fix. Different host kernel
-and different silicon hit the same entry, so this is a generic RISC-V KVM
-issue, not a board quirk.
+~80-86% hit rate unpatched, 0/6 with the candidate fix, and the tree in this
+repo replays the K3 unpatched case at 5/6. Different host kernel and different
+silicon hit the same entry, so this is a generic RISC-V KVM issue, not a board
+quirk.
 
 ## U-mode vs S-mode
 
